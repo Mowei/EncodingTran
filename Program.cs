@@ -13,13 +13,38 @@ namespace EncodingTran
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-            List<int> codePages = new List<int>() { 932, 20932, 51932, 50220, 50221, 50222, 65001, 1200, 12000, 12001, 65000, 1252 };
+            List<int> codePages = new List<int>() { 932, 20932, 51932, 50220, 50221, 50222, 65001, 1200, 12000, 12001, 65000, 1252, 936 };
 
-            var badstringFromDatabase = "09_‚¨‚Ü‚¯2FƒgƒDƒ‹[ƒGƒ“ƒh";
+            var badstringFromDatabase = "ƒ`ƒƒƒlƒ‹ƒp[ƒgƒi[‚Ì‘I‘ð\"";
 
             foreach (var codepage in codePages)
             {
                 var recovered = Encoding.GetEncoding(codepage).GetBytes(badstringFromDatabase);
+
+                var invalidByte = false;
+                for (int i = 0; i < recovered.Length; i++)
+                {
+                    //find utf-8_replacement_character EF BF BD
+                    i = recovered.ToList().FindIndex(i, x => x == 0xEF);
+                    if(i == -1) { break; }
+                    if (i + 3 <= recovered.Length)
+                    {
+                        var bytes = recovered.ToList().Skip(i).Take(3).ToArray();
+                        if (bytes[0] == 0xef && bytes[1] == 0xbf && bytes[2] == 0xbd)
+                        {
+                            invalidByte = true;
+                            break;
+                        }
+                    }
+
+                }
+                if(invalidByte) {
+                    //基本上是轉壞了無法復原
+                    Console.WriteLine("! Find utf-8 replacement character " + codepage);
+                    continue; 
+                }
+
+
                 Console.WriteLine("read codePage " + codepage);
                 foreach (var codepage2 in codePages)
                 {
@@ -66,7 +91,7 @@ namespace EncodingTran
 
         public static void ConvertCodePage(int codePage, byte[] recovered)
         {
-            Console.WriteLine("To " + codePage + " : "+Encoding.GetEncoding(codePage).GetString(recovered));
+            Console.WriteLine("To " + codePage + " : " + Encoding.GetEncoding(codePage).GetString(recovered));
         }
     }
 }
